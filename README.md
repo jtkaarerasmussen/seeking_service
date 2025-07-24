@@ -9,7 +9,7 @@ pip3 install matplotlib numpy
 
 Next, you have to the compile the rust simulation, which can be done with cargo as follows:
 ```
-cd sim && cargo build --release && cd ..
+(cd sim && cargo build --release)
 ```
 At this point, you can run the example with
 ```
