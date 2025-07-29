@@ -1,0 +1,106 @@
+---
+title: "Caribbean Reef Fish"
+author: "HVM"
+date: "2025-02-14"
+output: html_document
+---
+
+## Setup
+```{r}
+require(readxl) # import excel files
+
+# Color palette from Manu https://g-thomson.github.io/Manu/
+choosycol1 <- rgb(195/255,182/255,230/255) # Hoiho color 1
+choosycol2 <- rgb(113/255,102/255,126/255) # Hoiho color 2
+rescol1 <- rgb(203/255,173/255,74/255) # Kea color 2
+rescol2 <- rgb(125/255,97/255,63/255) # Kea color 4
+```
+
+```{r}
+dat <- as.data.frame(read_excel("/Users/hollyvm/GoogleSync/StudentWork/JonatanKaareRasmussen/ClientData_Feb2025.xlsx",sheet=1))
+head(dat)
+```
+
+```{r}
+visit.summary <- as.data.frame(tapply(dat$`number of visits`,dat$site,FUN='sum'))
+colnames(visit.summary) <- 'TotVisits'
+visit.summary$choosy.visits <- tapply(dat[dat$Movement=='Choosy',]$`number of visits`,dat[dat$Movement=='Choosy',]$site,FUN='sum')
+visit.summary$res.visits <- tapply(dat[dat$Movement=='Resident',]$`number of visits`,dat[dat$Movement=='Resident',]$site,FUN='sum')
+visit.summary$Tot.chooseorres <- visit.summary$choosy.visits+visit.summary$res.visits
+visit.summary$prop.choosy <- visit.summary$choosy.visits/visit.summary$Tot.chooseorres
+barplot(visit.summary$prop.choosy,las=1,names=rownames(visit.summary),xlab='Site',ylab='Prop. choosy',ylim=c(0,1))
+```
+
+
+```{r}
+x <- matrix(c(1,2,3,4,5,6),nrow=2,ncol=3)
+x
+
+barplot(x)
+```
+
+Rebuild the dataframe with rows for each fish species and columns for each site.
+```{r}
+# Create a new data frame listing fish by scientific name
+fish.dat <- as.data.frame(unique(dat$`Species or Genus`))
+colnames(fish.dat) <- 'Sci.Name'
+
+# Assign movement type, and remove fish with unassigned movement types. Sort by movement type.
+fish.dat$Movement.Type <- dat$Movement[match(fish.dat$Sci.Name,dat$`Species or Genus`)]
+fish.dat <- fish.dat[!is.na(fish.dat$Movement.Type),]
+fish.dat <- fish.dat[order(fish.dat$Movement.Type),]
+
+# Match proportion of visits by scientific name
+summ.propvis <- as.data.frame(tapply(dat[dat$site=='curacao',]$`proportion of total visits`,dat[dat$site=='curacao',]$`Species or Genus`,FUN='sum')); colnames(summ.propvis) <- 'prop.vis'
+fish.dat$Curacao <- summ.propvis$prop.vis[match(fish.dat$Sci.Name,rownames(summ.propvis))]
+summ.propvis <- as.data.frame(tapply(dat[dat$site=='Honduras',]$`proportion of total visits`,dat[dat$site=='Honduras',]$`Species or Genus`,FUN='sum')); colnames(summ.propvis) <- 'prop.vis'
+fish.dat$Honduras <- summ.propvis$prop.vis[match(fish.dat$Sci.Name,rownames(summ.propvis))]
+summ.propvis <- as.data.frame(tapply(dat[dat$site=='US Virgin Islands',]$`proportion of total visits`,dat[dat$site=='US Virgin Islands',]$`Species or Genus`,FUN='sum')); colnames(summ.propvis) <- 'prop.vis'
+fish.dat$USVI <- summ.propvis$prop.vis[match(fish.dat$Sci.Name,rownames(summ.propvis))]
+
+# Assign missing data to 0s
+fish.dat[is.na(fish.dat$Curacao),]$Curacao <- 0
+fish.dat[is.na(fish.dat$Honduras),]$Honduras <- 0
+fish.dat[is.na(fish.dat$USVI),]$USVI <- 0
+
+# Add a final row for 'other' (i.e., visits by fish that are neither choosy nor resident, or for which this information is unknown)
+fish.dat <- rbind(fish.dat,c('Other','Other',1-colSums(fish.dat[,3:5])))
+
+
+# Create colors
+choosy.pal <- colorRampPalette(c(choosycol2, choosycol1,'gray95'))
+resident.pal <- colorRampPalette(c(rescol1,rescol2))
+num.choosy <- sum(fish.dat$Movement.Type=='Choosy')
+num.resident <- sum(fish.dat$Movement.Type=='Resident')
+fish.dat$color <- NaN
+fish.dat[fish.dat$Movement.Type=='Choosy',]$color <- choosy.pal(num.choosy)
+fish.dat[fish.dat$Movement.Type=='Resident',]$color <- resident.pal(num.resident)
+fish.dat[fish.dat$Movement.Type=='Other',]$color <- 'white'
+```
+
+```{r,fig.height=6,fig.width=5}
+barplot(as.matrix(fish.dat[,3:5]),las=1,ylab='Proportion of Visits',xlab='Site                  ',names=c('Curaçao','Honduras','USVI'),ylim=c(0,1.05),col=fish.dat$color,legend=F,xlim=c(0,5))
+
+leg.xcoords <- c(4.1,4.4)
+leg.ycoords.res <- seq(.75,1,len=100)-.13
+leg.ycoords.choosy <- seq(.47,.72,len=100)-.13
+rect(min(leg.xcoords),0.9,max(leg.xcoords),1)
+image(leg.xcoords,leg.ycoords.res,matrix(1:100,nrow=1),col=resident.pal(100),add=T)
+rect(min(leg.xcoords),min(leg.ycoords.res),max(leg.xcoords),max(leg.ycoords.res))
+image(leg.xcoords,leg.ycoords.choosy,matrix(1:100,nrow=1),col=choosy.pal(100),add=T)
+rect(min(leg.xcoords),min(leg.ycoords.choosy),max(leg.xcoords),max(leg.ycoords.choosy))
+text(max(leg.xcoords)+.2,.976,'Unk.',srt=270,pos=1)
+text(max(leg.xcoords)+.2,max(leg.ycoords.res)-.105,'Resident',srt=270,pos=1)
+text(max(leg.xcoords)+.2,max(leg.ycoords.choosy)-.095,'Choosy',srt=270,pos=1)
+
+choosy.tot.prop <- tapply(dat[dat$Movement=='Choosy',]$`proportion of total visits`,dat[dat$Movement=='Choosy',]$site,FUN='sum')
+res.tot.prop <- tapply(dat[dat$Movement=='Resident',]$`proportion of total visits`,dat[dat$Movement=='Resident',]$site,FUN='sum')
+
+text(seq(.7,3.15,length=3)-.3,1.03,paste(as.numeric(round(choosy.tot.prop*100,0)),'%',sep=''),col=choosycol2)
+text(seq(.7,3.15,length=3),1.03,rep('/',3),cex=1.2)
+text(seq(.7,3.15,length=3)+.3,1.03,paste(as.numeric(round(res.tot.prop*100,0)),'%',sep=''),col=rescol2)
+
+```
+
+
+
