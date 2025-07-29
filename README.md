@@ -1,4 +1,4 @@
-Code associated with the manuscript "___"
+Code associated with the manuscript "Seeking Service: How Client Behavior Determines Cleaning Station Clustering" 
 
 All simulations were done with python 3.12 and cargo 1.87
 
